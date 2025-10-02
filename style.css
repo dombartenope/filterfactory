@@ -353,58 +353,58 @@ label { font-size: 0.85rem; color: var(--muted); }
   .codepane { position: static; }
 }
 
-/* ===== Responsive fixes to avoid horizontal scrolling ===== */
+/* ===========================
+   Fit-to-viewport layout fixes
+   =========================== */
 
-/* Keep the page from side-scrolling if anything misbehaves */
-html, body { overflow-x: hidden; }
+/* Never let the 2-column canvas exceed the available width next to the sidebar */
+.canvas { padding: 1.25rem; }
 
-/* Tighter canvas padding on smaller laptops */
-.canvas { padding: 1.5rem 1rem; }
-
-/* Main two-column area: widen middle a bit but cap total width */
 .canvas-inner {
+  /* use all available width inside the canvas */
+  width: 100%;
+  max-width: none;             /* remove previous hard caps */
+  margin: 0;
   display: grid;
-  grid-template-columns: minmax(640px, 1fr) 520px;  /* middle | code */
+  /* fluid columns: wide middle, capped code pane */
+  grid-template-columns: minmax(560px, 1fr) minmax(360px, 520px);
   gap: 16px;
-  max-width: 1280px;                                /* cap overall width */
-  margin: 0 auto;                                   /* center the grid */
   align-items: start;
 }
 
-/* Sidebar: keep compact so it doesn't push content off-screen */
+/* Make sure nodes column can shrink without forcing overflow */
+.nodes {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Code pane: never wider than its column; only vertical resize */
+.codepane { position: sticky; top: 12px; align-self: start; }
+.code { max-width: 100%; resize: vertical; }
+
+/* Sidebar width trimmed a touch so the canvas has more room */
 .sidebar {
-  max-width: 340px;
+  max-width: 320px;            /* was ~340–360 */
   width: 100%;
   position: sticky;
   top: 12px;
   align-self: start;
 }
 
-/* Nodes column should never exceed the grid width */
-.nodes { width: 100%; max-width: 100%; }
-
-/* Code pane: sticky, never exceed its column, resize only vertically */
-.codepane { position: sticky; top: 12px; align-self: start; }
-.code { max-width: 100%; resize: vertical; }
-
-/* Breakpoints */
-@media (max-width: 1400px) {
-  /* Slightly narrower code pane so both columns fit comfortably */
+/* If viewport is not wide enough for all three areas, stack the code pane */
+@media (max-width: 1350px) {
   .canvas-inner {
-    grid-template-columns: minmax(600px, 1fr) 480px;
-    max-width: 1180px;
+    grid-template-columns: 1fr;   /* nodes full width */
   }
-}
-
-@media (max-width: 1200px) {
-  /* Stack the code pane under the nodes to remove any chance of overflow */
-  .canvas-inner { grid-template-columns: 1fr; max-width: 900px; }
   .codepane { position: static; }
 }
 
-/* On tablet/phone widths, also stack the left filter sidebar above content */
-@media (max-width: 900px) {
+/* On narrower screens also stack the left sidebar above everything */
+@media (max-width: 980px) {
   .app { grid-template-columns: 1fr; }
   .sidebar { position: static; max-width: 100%; }
   .canvas { padding: 1rem; }
 }
+
+/* As a last resort, ban horizontal scroll */
+html, body { overflow-x: hidden; }

@@ -405,4 +405,6 @@ html, body { overflow-x: hidden; }
 /* On tablet/phone widths, also stack the left filter sidebar above content */
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
-  .sidebar { posit
+  .sidebar { position: static; max-width: 100%; }
+  .canvas { padding: 1rem; }
+}

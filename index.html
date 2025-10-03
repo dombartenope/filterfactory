@@ -38,16 +38,23 @@
     <!-- Center: nodes -->
     <section class="nodes" id="nodes"></section>
 
-    <!-- Right: code sample -->
-    <aside class="codepane">
-      <div class="card codecard">
-        <div class="codecard-header">
-          <h3>OneSignal Filters</h3>
-          <button id="copyCodeBtn" class="btn btn-sm">Copy</button>
-        </div>
-        <textarea id="filtersOutput" class="code" readonly spellcheck="false"></textarea>
+<!-- Right: code sample -->
+<aside class="codepane">
+  <div class="card codecard">
+    <div class="codecard-header">
+      <h3>OneSignal Filters</h3>
+      <div class="codecard-actions">
+        <label class="toggle">
+          <input type="checkbox" id="editJsonToggle" />
+          <span>Edit</span>
+        </label>
+        <button id="applyJsonBtn" class="btn btn-sm">Apply JSON</button>
+        <button id="copyCodeBtn" class="btn btn-sm">Copy</button>
       </div>
-    </aside>
+    </div>
+    <textarea id="filtersOutput" class="code" readonly spellcheck="false"></textarea>
+  </div>
+</aside>
   </div>
 </main>
 

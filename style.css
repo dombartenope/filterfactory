@@ -230,6 +230,11 @@ label { font-size: 0.85rem; color: var(--muted); }
   margin: 0;
   font-size: 1rem;
 }
+.codecard-header { gap: 8px; }
+.codecard-actions { display: flex; align-items: center; gap: 8px; }
+
+.toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.toggle input { accent-color: var(--ring); }
 
 .code {
   width: 100%;
@@ -279,6 +284,23 @@ label { font-size: 0.85rem; color: var(--muted); }
   position: relative;
   padding-bottom: 64px;                           /* was 72px */
 }
+/* Overridden node highlight */
+.node-conflict {
+  border-color: rgba(255, 99, 99, 0.35);
+  box-shadow: 0 0 0 3px rgba(255, 99, 99, 0.15);
+}
+
+.node-warning {
+  display: none;
+  margin-left: 8px;
+  font-size: 0.78rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 99, 99, 0.35);
+  background: rgba(255, 99, 99, 0.08);
+  color: #ff9aa2;
+}
+.node-conflict .node-warning { display: inline-block; }
 .group + .group { margin-top: 14px; }             /* was 22px */
 
 /* Code panel stays sticky and only resizes vertically */

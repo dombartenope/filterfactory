@@ -6,6 +6,53 @@ document.addEventListener("DOMContentLoaded", () => {
   const newConditionBtn = document.getElementById("newConditionBtn");
   const copyBtn = document.getElementById("copyCodeBtn");
   const filtersOutput = document.getElementById("filtersOutput");
+   
+// Toggle editability
+const editToggle = document.getElementById("editJsonToggle");
+if (editToggle && filtersOutput) {
+  filtersOutput.readOnly = true;
+  editToggle.addEventListener("change", () => {
+    filtersOutput.readOnly = !editToggle.checked;
+    filtersOutput.classList.toggle("editable", editToggle.checked);
+  });
+}
+
+// Apply JSON to rebuild UI
+const applyBtn = document.getElementById("applyJsonBtn");
+if (applyBtn && filtersOutput) {
+  applyBtn.addEventListener("click", () => {
+    const raw = filtersOutput.value.trim();
+    if (!raw) return;
+
+    // Accept either: "filters": [ ... ]  OR just [ ... ]
+    let arr = null;
+    try {
+      if (raw.startsWith('"filters"') || raw.startsWith("'filters'")) {
+        const wrapped = `{${raw}}`;
+        const obj = JSON.parse(wrapped);
+        arr = obj.filters;
+      } else {
+        const parsed = JSON.parse(raw);
+        arr = Array.isArray(parsed) ? parsed : parsed.filters;
+      }
+    } catch (e) {
+      // brief feedback
+      const old = applyBtn.textContent;
+      applyBtn.textContent = "Invalid JSON";
+      setTimeout(() => (applyBtn.textContent = old), 1100);
+      return;
+    }
+
+    if (!Array.isArray(arr)) {
+      const old = applyBtn.textContent;
+      applyBtn.textContent = "Expected an array";
+      setTimeout(() => (applyBtn.textContent = old), 1100);
+      return;
+    }
+
+    filtersToDom(arr);
+  });
+}
 
   // -----------------------
   // Schema from your spec
@@ -82,6 +129,16 @@ document.addEventListener("DOMContentLoaded", () => {
     "exists": "exists",
     "doesn't exist": "not_exists"
   };
+const REL_MAP_INV = {
+  "=": "is",
+  "!=": "is not",
+  ">": "is greater than",
+  "<": "is less than",
+  "time_elapsed_gt": "time elapsed since is greater than",
+  "time_elapsed_lt": "time elapsed since is less than",
+  "exists": "exists",
+  "not_exists": "doesn't exist"
+};
 
   const FIELD_MAP = {
     Country: "country",
@@ -113,7 +170,126 @@ document.addEventListener("DOMContentLoaded", () => {
   function getGroups() {
     return Array.from(nodes.querySelectorAll(".group"));
   }
+// Create a node in a given group from field+values and attach payload
+function createNodeInGroup(field, values, group) {
+  const body = group.querySelector(".group-body");
 
+  const node = document.createElement("div");
+  node.className = "node node-ok";
+  node.appendChild(nodeContent(field, values));
+  node.__payload = { field, values };
+
+  const remove = document.createElement("button");
+  remove.className = "btn btn-sm remove";
+  remove.textContent = "Remove";
+  remove.addEventListener("click", () => {
+    node.remove();
+    updateGroupCount(group);
+    refreshCodeSample();
+  });
+
+  node.appendChild(remove);
+  body.appendChild(node);
+  updateGroupCount(group);
+  return node;
+}
+
+// Per-group limits: Tag unlimited, everything else max 1
+const PER_GROUP_LIMITS = new Proxy({}, {
+  get: (_, field) => (field === "Tag" ? Infinity : 1)
+});
+
+function countFieldInGroup(group, field) {
+  return Array.from(group.querySelectorAll(".group-body .node"))
+    .filter(n => n.__payload && n.__payload.field === field).length;
+}
+/** Is this relation "definitive" for conflict purposes? */
+function isDefinitiveRelation(field, relationWord) {
+  // Start simple: "is" dominates other relations of the same field
+  return relationWord === "is";
+}
+
+/** Scan a single group and add/remove conflict styles */
+function updateConflictHighlightsForGroup(group) {
+  const nodesInGroup = Array.from(group.querySelectorAll(".group-body .node"));
+
+  // Map field -> { hasDefinitive: bool, nodes: Node[] }
+  const fieldMap = new Map();
+  nodesInGroup.forEach(n => {
+    const p = n.__payload;
+    if (!p) return;
+
+    // ⬇️ Skip Tag entirely
+    if (p.field === "Tag") return;
+
+    const list = fieldMap.get(p.field) || { hasDefinitive: false, nodes: [] };
+    list.nodes.push(n);
+    const relWord = p.values?.Relation || "";
+    if (isDefinitiveRelation(p.field, relWord)) list.hasDefinitive = true;
+    fieldMap.set(p.field, list);
+  });
+
+  // Apply classes based on map (unchanged)
+  fieldMap.forEach(({ hasDefinitive, nodes }) => {
+    if (!hasDefinitive || nodes.length <= 1) {
+      nodes.forEach(n => n.classList.remove("node-conflict"));
+      return;
+    }
+    nodes.forEach(n => {
+      const relWord = n.__payload?.values?.Relation || "";
+      const conflicted = !isDefinitiveRelation(n.__payload.field, relWord);
+      n.classList.toggle("node-conflict", conflicted);
+    });
+  });
+
+  // Ensure warning pill exists; it will only show on .node-conflict
+  nodesInGroup.forEach(n => {
+    if (n.__payload?.field === "Tag") return; // ⬅️ don't add warnings to Tag nodes
+    let warn = n.querySelector(".node-warning");
+    if (!warn) {
+      warn = document.createElement("span");
+      warn.className = "node-warning";
+      warn.textContent = "overridden by 'is' in this group";
+      const meta = n.querySelector(".node-meta") || n.firstElementChild || n;
+      meta.appendChild(warn);
+    }
+  });
+}
+
+/** Run for all groups */
+function updateAllConflictHighlights() {
+  getGroups().forEach(updateConflictHighlightsForGroup);
+}
+
+// Decide which group to add to; create a new one if the limit would be exceeded
+function findTargetGroupFor(field, preferredGroup) {
+  const limit = PER_GROUP_LIMITS[field];
+  const groups = getGroups();
+  const fallback = groups[groups.length - 1] || null;
+  const chosen = preferredGroup || fallback;
+
+  if (!chosen) {
+    // No groups yet; create Condition 1
+    const g = createGroup(1);
+    nodes.appendChild(g);
+    renumberGroups();
+    setActiveGroup(g);
+    currentGroup = g;
+    return g;
+  }
+
+  // If adding this field would exceed the limit, create a new group
+  if (countFieldInGroup(chosen, field) >= limit) {
+    const g = createGroup(groups.length + 1);
+    nodes.appendChild(g);
+    renumberGroups();
+    setActiveGroup(g);
+    currentGroup = g;
+    return g;
+  }
+
+  return chosen;
+}
   function createRemoveButtonFor(group) {
     const btn = document.createElement("button");
     btn.className = "btn btn-sm";
@@ -131,6 +307,72 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     return btn;
   }
+
+// Tag is unlimited in a group; some fields allow multiple when Relation is "is not"
+// Fields that may repeat in a group when Relation is "is not"
+const MULTI_NEGATION_FIELDS = new Set(["Country", "Language", "AppVersion"]);
+
+/**
+ * Whether a field may appear multiple times in the same group,
+ * given the human-readable relation word from the UI/JSON.
+ *
+ * Rules:
+ * - Tag: unlimited
+ * - Any field with "is greater than" or "is less than": unlimited
+ * - Country/Language/AppVersion with "is not": unlimited
+ * - Everything else: max 1 per group
+ */
+function allowsMultipleInGroup(field, relationWord) {
+  if (field === "Tag") return true;
+
+  if (relationWord === "is greater than" || relationWord === "is less than") {
+    return true; // new rule: gt/lt ignore max limits for all fields
+  }
+
+  if (relationWord === "is not" && MULTI_NEGATION_FIELDS.has(field)) {
+    return true; // multiple negations allowed for these specific fields
+  }
+
+  return false; // otherwise, cap at 1 per group
+}
+
+function countFieldInGroup(group, field) {
+  return Array.from(group.querySelectorAll(".group-body .node"))
+    .filter(n => n.__payload && n.__payload.field === field).length;
+}
+
+/**
+ * Decide which group to add to; create a new group if the per-group rule
+ * would be violated. relationWord is the UI word, e.g., "is", "is not"
+ */
+function findTargetGroupFor(field, relationWord, preferredGroup) {
+  const groups = getGroups();
+  const fallback = groups[groups.length - 1] || null;
+  const chosen = preferredGroup || fallback;
+
+  // ensure at least one group exists
+  if (!chosen) {
+    const g = createGroup(1);
+    nodes.appendChild(g);
+    renumberGroups();
+    setActiveGroup(g);
+    currentGroup = g;
+    return g;
+  }
+
+  // If multiples are NOT allowed and we already have one, create a new group
+  if (!allowsMultipleInGroup(field, relationWord) &&
+      countFieldInGroup(chosen, field) >= 1) {
+    const g = createGroup(groups.length + 1);
+    nodes.appendChild(g);
+    renumberGroups();
+    setActiveGroup(g);
+    currentGroup = g;
+    return g;
+  }
+
+  return chosen;
+}
 
   function renumberGroups() {
     const groups = getGroups();
@@ -345,17 +587,17 @@ function nodeContent(field, values) {
 
     const pill = document.createElement("span");
     pill.className = "node-pill";
-    pill.textContent = String(v); // textContent prevents HTML injection
+    pill.textContent = String(v);
     meta.appendChild(pill);
 
-    // small spacer
-    const spacer = document.createTextNode(" ");
-    meta.appendChild(spacer);
+    meta.appendChild(document.createTextNode(" "));
   }
 
+  // placeholder for warning pill (created dynamically if needed)
   wrap.appendChild(meta);
   return wrap;
 }
+
 
   function nodeToFilter(field, values) {
     const f = FIELD_MAP[field];
@@ -406,6 +648,84 @@ function nodeContent(field, values) {
     return out;
   }
 
+function filterToFieldValues(filterObj) {
+  // Decide field by "field" key
+  const apiField = String(filterObj.field || "").toLowerCase();
+
+  // Tag
+  if (apiField === "tag") {
+    const key = filterObj.key ?? filterObj.tag_key; // some users paste tag_key
+    const relWord = REL_MAP_INV[String(filterObj.relation || "")] || "is";
+    const values = { Key: String(key ?? "") };
+
+    // exists / not_exists have no Value
+    if (filterObj.relation === "exists" || filterObj.relation === "not_exists") {
+      values.Relation = relWord;
+      return { field: "Tag", values };
+    }
+
+    // time elapsed variants
+    if (filterObj.relation === "time_elapsed_gt" || filterObj.relation === "time_elapsed_lt") {
+      values.Relation = relWord;
+      values.Value = String(filterObj.value ?? "");
+      return { field: "Tag", values };
+    }
+
+    // normal equals/gt/lt etc
+    values.Relation = relWord;
+    values.Value = String(filterObj.value ?? "");
+    return { field: "Tag", values };
+  }
+
+  // Location
+  if (apiField === "location") {
+    return {
+      field: "Location",
+      values: {
+        Radius: String(filterObj.radius ?? ""),
+        Lat: String(filterObj.lat ?? ""),
+        Long: String(filterObj.long ?? "")
+      }
+    };
+  }
+
+  // First/Last session
+  if (apiField === "first_session" || apiField === "last_session") {
+    const field = apiField === "first_session" ? "FirstSession" : "LastSession";
+    return {
+      field,
+      values: {
+        Relation: REL_MAP_INV[String(filterObj.relation || ">")] || "is greater than",
+        HoursAgo: String(filterObj.hours_ago ?? "")
+      }
+    };
+  }
+
+  // Country, Language, AppVersion, SessionTime, SessionCount
+  // Map API field back to our UI field name
+  const FIELD_MAP_INV = {
+    country: "Country",
+    language: "Language",
+    app_version: "AppVersion",
+    session_time: "SessionTime",
+    session_count: "SessionCount"
+  };
+
+  const uiField = FIELD_MAP_INV[apiField];
+  if (uiField) {
+    return {
+      field: uiField,
+      values: {
+        Relation: REL_MAP_INV[String(filterObj.relation || "=")] || "is",
+        Value: String(filterObj.value ?? "")
+      }
+    };
+  }
+
+  // Unknown field, skip by returning null
+  return null;
+}
+
 function buildFiltersFromDom() {
   const groups = getGroups();
   const filters = [];
@@ -433,6 +753,51 @@ function buildFiltersFromDom() {
   return filters;
 }
 
+function filtersToDom(filters) {
+  // Clear and start fresh
+  nodes.innerHTML = "";
+  currentGroup = null;
+
+  // Always begin with Condition 1
+  let group = createGroup(1);
+  nodes.appendChild(group);
+
+  filters.forEach((entry) => {
+    if (entry && typeof entry === "object" && "operator" in entry) {
+      // Explicit OR starts a new group
+      if (String(entry.operator).toUpperCase() === "OR") {
+        const g = createGroup(getGroups().length + 1);
+        nodes.appendChild(g);
+        group = g;
+      }
+      return;
+    }
+
+    const parsed = filterToFieldValues(entry || {});
+    if (!parsed) return;
+
+    // Determine relation word for per-group rule
+    const relWord = parsed.values?.Relation || "";
+
+    // Choose the correct group. If the rule would be violated, this may create a new group.
+    const target = findTargetGroupFor(parsed.field, relWord, group);
+
+    // Add node to the chosen group
+    createNodeInGroup(parsed.field, parsed.values, target);
+
+    // If a new group was created by enforcement, continue adding into that group
+    group = target;
+  });
+
+  renumberGroups();
+  const last = getGroups()[getGroups().length - 1];
+  setActiveGroup(last);
+  currentGroup = last;
+  refreshCodeSample();
+        updateAllConflictHighlights();
+
+}
+
 function refreshCodeSample() {
   if (!filtersOutput) return;
   const filters = buildFiltersFromDom();
@@ -458,50 +823,61 @@ function refreshCodeSample() {
     refreshCodeSample();
   });
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const field = fieldSel.value;
-    const payload = readProps(field);
-    if (!payload.ok) return;
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const field = fieldSel.value;
+  const payload = readProps(field);
+  if (!payload.ok) return;
 
-    const group = currentGroup || getGroups().slice(-1)[0];
-    if (!group) return;
+  const relationWord = payload.values?.Relation || "";
+  const targetGroup = findTargetGroupFor(
+    field,
+    relationWord,
+    currentGroup || getGroups().slice(-1)[0]
+  );
+  if (!targetGroup) return;
 
-    const body = group.querySelector(".group-body");
+  const body = targetGroup.querySelector(".group-body");
 
-    const node = document.createElement("div");
-    node.className = "node node-ok";
-    node.appendChild(nodeContent(field, payload.values));
+  const node = document.createElement("div");
+  node.className = "node node-ok";
+  node.appendChild(nodeContent(field, payload.values));
 
-    // attach structured payload for the code builder
-    node.__payload = { field, values: payload.values };
+  // Store the payload for later (used in JSON export/import and warnings)
+  node.__payload = { field, values: payload.values };
 
-    const remove = document.createElement("button");
-    remove.className = "btn btn-sm remove";
-    remove.textContent = "Remove";
-    remove.addEventListener("click", () => {
-      node.remove();
-      updateGroupCount(group);
-      refreshCodeSample();
-    });
+  // Create the remove button
+  const remove = document.createElement("button");
+  remove.className = "btn btn-sm remove";
+  remove.textContent = "Remove";
 
-    node.appendChild(remove);
-    body.appendChild(node);
-    updateGroupCount(group);
-    node.scrollIntoView({ behavior: "smooth", block: "center" });
-
-    // reset current field inputs but keep field selection
-    propsBox.querySelectorAll("input, select").forEach(el => {
-      if (el.tagName === "SELECT") {
-        if (el.firstElementChild && el.firstElementChild.disabled) el.value = "";
-      } else {
-        el.value = "";
-      }
-    });
-    toggleValueVisibility(field);
-
+  // ⬇️ This is where that snippet goes
+  remove.addEventListener("click", () => {
+    node.remove();
+    updateGroupCount(targetGroup);
     refreshCodeSample();
+    updateAllConflictHighlights();   // new: highlight logic after removal
   });
+
+  node.appendChild(remove);
+  body.appendChild(node);
+
+  updateGroupCount(targetGroup);
+  node.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  // reset inputs but keep field selection
+  propsBox.querySelectorAll("input, select").forEach(el => {
+    if (el.tagName === "SELECT") {
+      if (el.firstElementChild && el.firstElementChild.disabled) el.value = "";
+    } else {
+      el.value = "";
+    }
+  });
+  toggleValueVisibility(field);
+
+  refreshCodeSample();
+  updateAllConflictHighlights();   // also run after adding
+});
 
   if (copyBtn && filtersOutput) {
     copyBtn.addEventListener("click", async () => {

@@ -430,3 +430,49 @@ label { font-size: 0.85rem; color: var(--muted); }
 
 /* As a last resort, ban horizontal scroll */
 html, body { overflow-x: hidden; }
+
+
+.json-error {
+  color: #ff9aa2;
+  font-size: 0.9rem;
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+
+.json-editor {
+  position: relative;
+  width: 100%;
+}
+
+.json-highlights {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 10px 12px;
+  font-family: monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: transparent; /* hide text itself */
+  white-space: pre-wrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.json-highlights mark {
+  background: rgba(255, 99, 99, 0.25);
+  border-radius: 3px;
+}
+
+#filtersOutput.code {
+  position: relative;
+  background: transparent;
+  color: var(--text);
+  font-family: monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  resize: vertical;
+}

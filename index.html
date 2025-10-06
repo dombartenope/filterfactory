@@ -1,63 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Filter Factory</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div class="app">
-    <!-- Left sidebar -->
-    <aside class="sidebar">
-      <div class="card">
-        <h2>Filters</h2>
-        <p class="hint">Add all filters you want grouped together under one condition</p>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <title>Filter Factory</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <div class="app">
+            <!-- Left sidebar -->
+            <aside class="sidebar">
+                <div class="card">
+                    <h2>Filters</h2>
+                    <p class="hint">Add all filters you want grouped together under one condition</p>
 
-        <form id="filterForm" class="form">
-          <div class="form-group">
-            <label for="field">Field</label>
-            <select id="field" class="select" required></select>
-          </div>
+                    <form id="filterForm" class="form">
+                        <div class="form-group">
+                            <label for="field">Field</label>
+                            <select id="field" class="select" required></select>
+                        </div>
 
-          <!-- Dynamic properties render here -->
-          <div id="props" class="props"></div>
+                        <!-- Dynamic properties render here -->
+                        <div id="props" class="props"></div>
 
-          <div class="form-actions">
-            <button type="submit" class="btn">Add to current condition</button>
-            <button type="button" id="newConditionBtn" class="btn btn-ghost">New condition</button>
-          </div>
-        </form>
-      </div>
-    </aside>
+                        <div class="form-actions">
+                            <button type="submit" class="btn">Add to current condition</button>
+                            <button type="button" id="newConditionBtn" class="btn btn-ghost">New condition</button>
+                        </div>
+                    </form>
+                </div>
+            </aside>
 
-    <!-- Center canvas -->
-<main class="canvas">
-  <div class="canvas-inner">
-    <!-- Center: nodes -->
-    <section class="nodes" id="nodes"></section>
+            <!-- Center canvas -->
+            <main class="canvas">
+                <div class="canvas-inner">
+                    <!-- Center: nodes -->
+                    <section class="nodes" id="nodes"></section>
 
-<!-- Right: code sample -->
-<aside class="codepane">
-  <div class="card codecard">
-    <div class="codecard-header">
-      <h3>OneSignal Filters</h3>
-      <div class="codecard-actions">
-        <label class="toggle">
-          <input type="checkbox" id="editJsonToggle" />
-          <span>Edit</span>
-        </label>
-        <button id="applyJsonBtn" class="btn btn-sm">Apply JSON</button>
-        <button id="copyCodeBtn" class="btn btn-sm">Copy</button>
-      </div>
-    </div>
-    <textarea id="filtersOutput" class="code" readonly spellcheck="false"></textarea>
-  </div>
-</aside>
-  </div>
-</main>
+                    <!-- Right: code sample -->
+                    <aside class="codepane">
+                        <div class="card codecard">
+                            <div class="codecard-header">
+                                <h3>OneSignal Filters</h3>
+                                <div class="codecard-actions">
+                                    <label class="toggle">
+                                        <input type="checkbox" id="editJsonToggle" />
+                                        <span>Edit</span>
+                                    </label>
+                                    <button id="applyJsonBtn" class="btn btn-sm">Apply JSON</button>
+                                    <button id="copyCodeBtn" class="btn btn-sm">Copy</button>
+                                </div>
+                            </div>
+                            <div class="json-editor">
+                                <pre id="jsonHighlights" class="json-highlights"></pre>
+                                <textarea id="filtersOutput" class="code" spellcheck="false"></textarea>
+                            </div>
+                            <p id="jsonErrorMsg" class="json-error"></p>
+                        </div>
+                    </aside>
+                </div>
+            </main>
 
-  <script src="script.js"></script>
-</body>
+            <script src="script.js"></script>
+    </body>
 </html>

@@ -476,3 +476,32 @@ html, body { overflow-x: hidden; }
   border: 1px solid var(--border);
   resize: vertical;
 }
+.json-editor {
+  position: relative;
+  width: 100%;
+}
+
+/* Left gutter that sits on top of the textarea, but doesn't block clicks */
+.json-gutter {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2; /* make sure it is above the textarea */
+}
+
+/* The red dot marker */
+.json-gutter .dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff3b30;            /* bright red */
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.25);
+  pointer-events: none;
+}
+
+/* Keep your textarea styles; ensure line-height is a fixed numeric value */
+#filtersOutput.code {
+  line-height: 1.5; /* already in your CSS; numeric is good for math */
+  padding: 10px 12px; /* we read this to place the dot */
+}

@@ -10,6 +10,90 @@ document.addEventListener("DOMContentLoaded", () => {
     const jsonErrorMsg = document.getElementById("jsonErrorMsg");
     const jsonHighlights = document.getElementById("jsonHighlights");
 
+    //Gutter
+const jsonGutter = document.getElementById("jsonGutter");
+let lastErrorLine = null;
+
+function getLineMetrics() {
+  const cs = window.getComputedStyle(filtersOutput);
+  let lh = parseFloat(cs.lineHeight);
+  if (Number.isNaN(lh)) {
+    const fs = parseFloat(cs.fontSize) || 14;
+    lh = fs * 1.4;
+  }
+  return {
+    lineHeight: lh,
+    padTop: parseFloat(cs.paddingTop) || 0,
+    padLeft: parseFloat(cs.paddingLeft) || 0,
+    padBottom: parseFloat(cs.paddingBottom) || 0,
+    borderTop: parseFloat(cs.borderTopWidth) || 0,
+    borderLeft: parseFloat(cs.borderLeftWidth) || 0,
+  };
+}
+function clearGutterDot() {
+  if (jsonGutter) jsonGutter.innerHTML = "";
+  lastErrorLine = null;
+}
+
+// Hide the dot if the line is not visible in the textarea viewport
+function isLineVisible(lineNum, metrics) {
+  const { lineHeight, padTop, padBottom } = metrics;
+  const contentTopPx = (lineNum - 1) * lineHeight;
+  const viewTop = filtersOutput.scrollTop;
+  const viewBottom = viewTop + filtersOutput.clientHeight - padTop - padBottom;
+  return contentTopPx >= viewTop && contentTopPx <= viewBottom;
+}
+
+function showGutterDot(lineNum) {
+  if (!jsonGutter) return;
+  const m = getLineMetrics();
+
+  // Hide if line is off screen
+  const contentY = (lineNum - 1) * m.lineHeight;
+  const viewTop = filtersOutput.scrollTop;
+  const viewBottom = viewTop + filtersOutput.clientHeight - m.padTop - m.padBottom;
+  if (contentY < viewTop || contentY > viewBottom) {
+    clearGutterDot();
+    lastErrorLine = lineNum;
+    return;
+  }
+
+  // Center the dot vertically on the target line
+  const centeredContentY = (lineNum - 0.5) * m.lineHeight;
+
+  // Convert to editor coords:
+  // textarea offset + borders + padding + content position - scroll
+  const top =
+    filtersOutput.offsetTop +
+    m.borderTop +
+    m.padTop +
+    (centeredContentY - filtersOutput.scrollTop);
+
+  // Place dot *inside* the left padding, not on the border
+  const inset = Math.max(6, Math.min(m.padLeft - 6, 12)); // clamp so it doesn't overlap
+  const left =
+    filtersOutput.offsetLeft +
+    m.borderLeft +
+    inset -
+    filtersOutput.scrollLeft;
+
+  jsonGutter.innerHTML = "";
+  const dot = document.createElement("div");
+  dot.className = "dot";
+  dot.style.top = `${Math.round(top - 4)}px`;   // -4 to center 8px height
+  dot.style.left = `${Math.round(left - 4)}px`; // -4 to center 8px width
+  jsonGutter.appendChild(dot);
+
+  lastErrorLine = lineNum;
+}
+
+// Reposition the dot on scroll/resize
+function syncGutterOnScroll() {
+  if (!lastErrorLine) return;
+  showGutterDot(lastErrorLine);
+}
+window.addEventListener("resize", syncGutterOnScroll);
+
     //Clear JSON error message if any
     let jsonHasError = false;
 
@@ -33,81 +117,105 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     // Apply JSON to rebuild UI
-    if (applyBtn && filtersOutput) {
-        applyBtn.addEventListener("click", () => {
-            clearJsonError();
-            if (jsonHighlights) jsonHighlights.innerHTML = ""; // clear any old highlights
-            const raw = filtersOutput.value.trim();
-            if (!raw) return;
+if (applyBtn && filtersOutput) {
+  applyBtn.addEventListener("click", () => {
+    clearJsonError();
+    clearHighlights();
 
-            let arr = null;
+    // Use FULL text for detection + highlighting; trimmed text only for JSON.parse
+    const fullText = filtersOutput.value;
+    const raw = fullText.trim();
+    if (!raw) return;
 
-            try {
-                if (raw.startsWith('"filters"') || raw.startsWith("'filters'")) {
-                    const wrapped = `{${raw}}`;
-                    const obj = JSON.parse(wrapped);
-                    arr = obj.filters;
-                } else {
-                    const parsed = JSON.parse(raw);
-                    arr = Array.isArray(parsed) ? parsed : parsed.filters;
-                }
-
-                // ✅ parsed successfully → remove any previous highlight + error
-                clearHighlights();
-                clearJsonError();
-            } catch (e) {
-                // ❌ draw highlight for the error line
-                jsonHasError = true;
-
-                const match = e.message.match(/position\s(\d+)/i);
-                if (match) {
-                    const pos = parseInt(match[1], 10);
-                    const before = filtersOutput.value.slice(0, pos);
-                    const lineNum = before.split(/\r?\n/).length;
-
-                    const lines = filtersOutput.value.split(/\r?\n/);
-                    const highlighted = lines
-                    .map((line, idx) =>
-                        idx + 1 === lineNum ? `<mark>${line || " "}</mark>` : line
-                    )
-                    .join("\n");
-                    if (jsonHighlights) jsonHighlights.innerHTML = highlighted;
-
-                    jsonErrorMsg.textContent = `❌ Invalid JSON on line ${lineNum}: ${e.message}`;
-                } else {
-                    if (jsonHighlights) jsonHighlights.innerHTML = "";
-                    jsonErrorMsg.textContent = `❌ Invalid JSON: ${e.message}`;
-                }
-                return;
-            }
-            // ✅ Valid JSON → continue
-            if (!Array.isArray(arr)) {
-                jsonErrorMsg.textContent =
-                    '❌ Expected a JSON array or "filters": [ ... ]';
-                return;
-            }
-
-            // Clean up stray ORs
-            while (arr.length && arr[0]?.operator) arr.shift();
-            while (arr.length && arr[arr.length - 1]?.operator) arr.pop();
-
-            filtersToDom(arr); // ← this stays where it was before
-        });
-        filtersOutput.addEventListener("input", () => {
-            // As soon as user types, remove any old red highlight & error text
-            if (jsonHasError) {
-                clearHighlights();        // remove red line highlight
-                clearJsonError();         // clear the message below
-            }
-        });
-
-        // Keep overlay scrolling in sync with textarea
-        filtersOutput.addEventListener("scroll", () => {
-            if (!jsonHighlights) return;
-            jsonHighlights.scrollTop = filtersOutput.scrollTop;
-            jsonHighlights.scrollLeft = filtersOutput.scrollLeft;
-        });
+    // Pre-check for common issues (unquoted "filters", comments) using FULL text
+    const pre = detectCommonJsonIssues(fullText);
+    if (pre) {
+      showGutterDot(pre.line);
+scrollToLine(pre.line, fullText);
+      jsonErrorMsg.textContent = `❌ ${pre.message}`;
+      return;
     }
+
+    let arr = null;
+
+    try {
+      // Accept either: "filters": [ ... ]  OR just [ ... ]
+      if (raw.startsWith('"filters"') || raw.startsWith("'filters'")) {
+        const wrapped = `{${raw}}`;
+        const obj = JSON.parse(wrapped);
+        arr = obj.filters;
+      } else {
+        const parsed = JSON.parse(raw);
+        arr = Array.isArray(parsed) ? parsed : parsed.filters;
+      }
+
+      // Success → remove any previous highlight & error
+      clearGutterDot();
+      clearJsonError();
+    } catch (e) {
+      // Use the engine's character position if available and map to a FULL-text line
+      const m = e.message.match(/position\s(\d+)/i);
+      if (m) {
+        const pos = parseInt(m[1], 10);
+        const before = fullText.slice(0, pos);
+        const lineNum = before.split(/\r?\n/).length;
+      showGutterDot(lineNum);
+        scrollToLine(lineNum, fullText); 
+        jsonErrorMsg.textContent = `❌ Invalid JSON on line ${lineNum}: ${e.message}`;
+      } else {
+        // If no position, highlight line 1 as a fallback
+        highlightLine(1, fullText);
+        jsonErrorMsg.textContent = `❌ Invalid JSON: ${e.message}`;
+      }
+      return;
+    }
+
+    if (!Array.isArray(arr)) {
+      jsonErrorMsg.textContent = '❌ Expected a JSON array or "filters": [ ... ]';
+      return;
+    }
+
+    // Strip stray ORs on ends
+    while (arr.length && arr[0]?.operator) arr.shift();
+    while (arr.length && arr[arr.length - 1]?.operator) arr.pop();
+
+    filtersToDom(arr);
+  });
+function indexOfLineStart(text, targetLine) {
+  if (targetLine <= 1) return 0;
+  let idx = 0, line = 1;
+  while (line < targetLine && idx < text.length) {
+    const nl = text.indexOf('\n', idx);
+    if (nl === -1) return text.length;
+    idx = nl + 1;
+    line++;
+  }
+  return idx;
+}
+
+function scrollToLine(lineNum, fullText) {
+  const pos = indexOfLineStart(fullText, lineNum);
+  filtersOutput.setSelectionRange(pos, pos);
+  filtersOutput.focus();
+  syncGutterOnScroll(); // re-position after the scroll change
+}
+  // QoL: clear highlight + error as soon as user starts editing
+filtersOutput.addEventListener("input", () => {
+  clearGutterDot();
+  clearJsonError();
+});
+
+  // QoL: keep overlay scroll in sync with textarea
+filtersOutput.addEventListener("scroll", () => {
+  // keep overlay scroll sync if you still have it
+  if (jsonHighlights) {
+    jsonHighlights.scrollTop = filtersOutput.scrollTop;
+    jsonHighlights.scrollLeft = filtersOutput.scrollLeft;
+  }
+  // keep the gutter dot aligned
+  syncGutterOnScroll();
+});
+}
 
     // -----------------------
     // Schema from your spec
@@ -310,6 +418,191 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+
+function escapeHtml(s) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function highlightLine(lineNum, text) {
+  if (!jsonHighlights) return;
+  const lines = (text ?? filtersOutput.value).split(/\r?\n/);
+  const highlighted = lines
+    .map((line, idx) =>
+      idx + 1 === lineNum
+        ? `<mark>${escapeHtml(line || " ")}</mark>`
+        : escapeHtml(line)
+    )
+    .join("\n");
+  jsonHighlights.innerHTML = highlighted;
+  jsonHasError = true;
+
+  // NEW: keep the overlay aligned with the current textarea scroll
+  jsonHighlights.scrollTop = filtersOutput.scrollTop;
+  jsonHighlights.scrollLeft = filtersOutput.scrollLeft;
+}
+
+function detectCommonJsonIssues(fullText) {
+  // A) Unquoted top-level key (e.g., filters : [)
+  const lines = fullText.split(/\r?\n/);
+  const firstNonEmptyLineIdx = lines.findIndex(l => l.trim().length > 0);
+  if (firstNonEmptyLineIdx !== -1) {
+    const firstLine = lines[firstNonEmptyLineIdx];
+    if (/^\s*filters\s*:/.test(firstLine)) {
+      return {
+        line: firstNonEmptyLineIdx + 1,
+        message: 'Top-level key must be quoted. Use `"filters": [ ... ]` or paste just `[ ... ]`.'
+      };
+    }
+  }
+
+  // B) Comments (outside strings)
+  const commentLine = findFirstCommentLine(fullText);
+  if (commentLine !== null) {
+    return {
+      line: commentLine + 1,
+      message: "Comments are not allowed in JSON. Remove `//` or `/* ... */`."
+    };
+  }
+
+  // C) Trailing comma before ] or } (outside strings/comments)
+  const trailing = findTrailingCommaLine(fullText);
+  if (trailing !== null) {
+    return {
+      line: trailing + 1,
+      message: "Trailing comma before closing bracket/brace. Remove the last comma."
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Return the 0-based line index of the first comment start outside strings, or null.
+ * Handles escapes, // single-line comments, and /* block comments *\/.
+ */
+function findFirstCommentLine(text) {
+  let inString = false;
+  let escape = false;
+  let inBlock = false;
+  let line = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    // Count lines early to keep line number in sync
+    if (ch === '\n') line++;
+
+    // If inside a block comment, only look for the end
+    if (inBlock) {
+      if (ch === '*' && next === '/') {
+        inBlock = false;
+        i++; // skip '/'
+      }
+      continue;
+    }
+
+    // If inside a string, respect escapes and closing quote
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (ch === '\\') {
+        escape = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    // Outside string and not in block: detect comment starts
+    if (ch === '/' && next === '/') return line; // // ...
+    if (ch === '/' && next === '*') {            // /* ...
+      inBlock = true;
+      return line;
+    }
+
+    // Enter string
+    if (ch === '"') inString = true;
+  }
+  return null;
+}
+function findTrailingCommaLine(text) {
+  let inString = false;
+  let escape = false;
+  let inBlock = false;
+  let line = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    // track line number early
+    if (ch === '\n') line++;
+
+    // inside block comment: look only for end */
+    if (inBlock) {
+      if (ch === '*' && next === '/') {
+        inBlock = false;
+        i++; // skip '/'
+      }
+      continue;
+    }
+
+    // inside string: respect escapes and closing "
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (ch === '\\') {
+        escape = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    // starting comment?
+    if (ch === '/' && next === '/') {
+      // single-line comment: skip until end of line
+      while (i < text.length && text[i] !== '\n') i++;
+      // loop will increment line if it just hit \n
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      inBlock = true;
+      continue;
+    }
+
+    // entering string?
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    // potential trailing comma?
+    if (ch === ',') {
+      // look ahead for first non-space/tab/newline char
+      let j = i + 1;
+      while (j < text.length) {
+        const c = text[j];
+        if (c === ' ' || c === '\t' || c === '\r' || c === '\n') {
+          if (c === '\n') { /* line++ will happen next loop on main i */ }
+          j++;
+          continue;
+        }
+        // if the next significant char closes an array/object, this comma is trailing
+        if (c === ']' || c === '}') {
+          return line; // return line of the comma
+        }
+        break; // otherwise it's a normal comma
+      }
+    }
+  }
+  return null;
+}
 
     /** Run for all groups */
     function updateAllConflictHighlights() {

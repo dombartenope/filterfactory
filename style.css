@@ -121,11 +121,6 @@ display:flex;align-items:center;justify-content:space-between;box-shadow:0 8px 2
 .node-meta{color:var(--muted);font-size:.9rem}
 .node-pill{font-size:.8rem;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:#0f1324;margin-left:8px}
 .node-ok{border-color:rgba(53,194,141,.3);box-shadow:0 0 0 3px rgba(53,194,141,.15)}
-/* conflict hint */
-.node-conflict{border-color:rgba(255,99,99,.35);box-shadow:0 0 0 3px rgba(255,99,99,.15)}
-.node-warning{display:none;margin-left:8px;font-size:.78rem;padding:3px 8px;border-radius:999px;
-border:1px solid rgba(255,99,99,.35);background:rgba(255,99,99,.08);color:#ff9aa2}
-.node-conflict .node-warning{display:inline-block}
 
 .group{
     border:1px solid rgba(53,194,141,.28);

@@ -30,20 +30,48 @@ body::after{
 background-size:220px 220px;mix-blend-mode:overlay;opacity:.6}
 
 /* ========= Layout ========= */
-.app{display:grid;grid-template-columns:320px 1fr;min-height:100vh}
-.sidebar{padding:2rem 1rem 2rem 1.5rem;position:sticky;top:12px;align-self:start;max-width:320px;height:fit-content;width:100%}
-.canvas{padding:1.25rem}
-.canvas-inner{
-    width:100%;margin:0;display:grid;align-items:start;gap:16px;
-grid-template-columns:minmax(560px,1fr) minmax(360px,520px)}
-@media (max-width:1350px){
-    .canvas-inner{grid-template-columns:1fr}
-    .codepane{position:static}
+/* ===== Layout ===== */
+.app{
+  display:grid;
+  grid-template-columns: 320px minmax(0,1fr); /* sidebar | main */
+  gap:20px;
+  min-height:100vh;
 }
+
+/* Canvas is just spacing; the inner grid handles the split */
+.canvas{ padding:1.25rem; }
+
+/* Equal halves for nodes and JSON, no caps */
+.canvas-inner{
+  display:grid;
+  align-items:start;
+  gap:16px;
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr); /* 50/50 split */
+  width:100%;
+  margin:0;
+}
+
+/* Make sure both columns can actually fill their tracks */
+.nodes, .codepane { width:100%; }
+
+/* Keep your existing sticky sidebar */
+.sidebar{
+  padding:2rem 1rem 2rem 1.5rem;
+  position:sticky; top:12px; align-self:start;
+  max-width:320px; height:fit-content; width:100%;
+}
+
+/* Responsive: stack nodes and JSON under each other */
+@media (max-width:1350px){
+  .canvas-inner{ grid-template-columns: 1fr; }
+  .codepane{ position:static; }
+}
+
+/* Mobile: sidebar stacks */
 @media (max-width:980px){
-    .app{grid-template-columns:1fr}
-    .sidebar{position:static;max-width:100%}
-    .canvas{padding:1rem}
+  .app{ grid-template-columns: 1fr; }
+  .sidebar{ position:static; max-width:100%; }
+  .canvas{ padding:1rem; }
 }
 
 /* ========= Card ========= */

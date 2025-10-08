@@ -97,7 +97,166 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     return lh;
   }
+function initGroupAdder(group){
+  const adderRoot = group.querySelector(".group-adder");
+  if (!adderRoot) return;
 
+  // Allow "Add" and "Cancel" to bubble up to the delegated listeners,
+  // but suppress stray clicks inside the panel from toggling the group.
+  adderRoot.addEventListener("click", (e) => {
+    if (
+      e.target.closest(".adder-add-btn") ||
+      e.target.closest(".adder-cancel") ||
+      e.target.closest(".adder-collapsed")
+    ) {
+      return; // let it bubble
+    }
+    if (e.target.closest(".adder-panel")) {
+      e.stopPropagation(); // swallow background panel clicks only
+    }
+  });
+
+  const sel = group.querySelector(".adder-field");
+  const propsHost = group.querySelector(".adder-props");
+  if (!sel || !propsHost) return;
+
+  // Populate the field select
+  sel.innerHTML = "";
+  Object.keys(schema).forEach((k) => {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = k;
+    sel.appendChild(o);
+  });
+  if (sel.options.length) sel.selectedIndex = 0;
+
+  // Initial props for current field
+  renderAdderProps(group, sel.value);
+
+  // Re-render props when swapping fields
+  sel.addEventListener("change", () => {
+    renderAdderProps(group, sel.value);
+  });
+}
+
+function renderAdderProps(group, field){
+  const host = group.querySelector(".adder-props");
+  host.innerHTML = "";
+  const spec = schema[field].props;
+
+  const propsGrid = document.createElement("div");
+  propsGrid.className = "adder-props-grid";
+
+  // layout via CSS rules above
+  Object.entries(spec).forEach(([name, def])=>{
+    const wrap = document.createElement("div");
+    wrap.className = "form-group";
+    wrap.dataset.prop = name;
+
+    const lab = document.createElement("label");
+    lab.textContent = name;
+
+    let input;
+    if (def.type === "select") {
+      input = document.createElement("select");
+      input.className = "select";
+      input.required = true;
+      const ph = document.createElement("option");
+      ph.value = ""; ph.textContent = `Select ${name.toLowerCase()}`; ph.disabled = true; ph.selected = true;
+      input.appendChild(ph);
+      def.options.forEach(opt=>{
+        const o = document.createElement("option");
+        o.value = opt; o.textContent = opt;
+        input.appendChild(o);
+      });
+
+      if (name === "Relation") {
+        input.addEventListener("change", ()=>{
+          toggleAdderValueVisibility(group, field);
+        });
+      }
+    } else {
+      input = document.createElement("input");
+      input.className = "input";
+      input.type = def.type || "text";
+      if (def.placeholder) input.placeholder = def.placeholder;
+      if (def.min !== undefined) input.min = def.min;
+      if (def.step !== undefined) input.step = def.step;
+      input.required = true;
+    }
+
+    input.dataset.adderProp = name;
+    wrap.appendChild(lab);
+    wrap.appendChild(input);
+    propsGrid.appendChild(wrap);
+  });
+
+  host.appendChild(propsGrid);
+  toggleAdderValueVisibility(group, field);
+}
+
+function toggleAdderValueVisibility(group, field){
+  const relSel = group.querySelector('.adder-props [data-adder-prop="Relation"]');
+  const valueWrap = Array.from(group.querySelectorAll('.adder-props .form-group')).find(el=>el.dataset.prop === "Value");
+  if (!relSel || !valueWrap) return;
+
+  const valueInput = valueWrap.querySelector("input, select");
+  const noValueNeeded = field === "Tag" && (relSel.value === "exists" || relSel.value === "doesn't exist");
+
+  if (noValueNeeded) {
+    valueWrap.style.display = "none";
+    if (valueInput) {
+      valueInput.required = false;
+      valueInput.disabled = true;
+      valueInput.value = "";
+    }
+  } else {
+    valueWrap.style.display = "";
+    if (valueInput) {
+      valueInput.disabled = false;
+      valueInput.required = true;
+    }
+  }
+}
+
+function readAdderProps(group, field){
+  const spec = schema[field].props;
+  const values = {};
+  let ok = true;
+
+  Object.keys(spec).forEach(name=>{
+    const el = group.querySelector(`.adder-props [data-adder-prop="${name}"]`);
+    if (!el) return;
+
+    const wrap = el.closest(".form-group");
+    const hidden = wrap && wrap.style.display === "none";
+    if (el.disabled || hidden) return;
+
+    const v = String(el.value || "").trim();
+    if (el.required && !v) {
+      el.reportValidity();
+      ok = false;
+      return;
+    }
+    if (v) values[name] = v;
+  });
+
+  return { ok, values };
+}
+
+function resetAdderProps(group, field){
+  const spec = schema[field].props;
+  Object.keys(spec).forEach(name=>{
+    const el = group.querySelector(`.adder-props [data-adder-prop="${name}"]`);
+    if (!el) return;
+    if (el.tagName === "SELECT") {
+      if (el.firstElementChild && el.firstElementChild.disabled) el.value = "";
+      else el.selectedIndex = 0;
+    } else {
+      el.value = "";
+    }
+  });
+  toggleAdderValueVisibility(group, field);
+}
   function scrollToIndex(idx){
     if (!jsonMeasure || !filtersOutput) return;
     syncMirrorStyles();
@@ -260,18 +419,123 @@ document.addEventListener("DOMContentLoaded", () => {
     return btn;
   }
 
-  function createGroup(idx){
-    const group = document.createElement("div"); group.className="group";
-    const header = document.createElement("div"); header.className="group-header";
-    const title = document.createElement("div"); title.className="group-title"; title.textContent=`Condition ${idx}`;
-    const count = document.createElement("div"); count.className="group-count"; count.textContent="(0 items)";
-    const actions = document.createElement("div"); actions.className="group-actions";
-    header.appendChild(title); header.appendChild(count); header.appendChild(actions);
-    const body = document.createElement("div"); body.className="group-body";
-    group.appendChild(header); group.appendChild(body);
-    group.addEventListener("click",(e)=>{ if (e.target.closest(".group-actions")) return; setActiveGroup(group); currentGroup=group; });
-    return group;
+function createGroup(idx){
+  const group = document.createElement("div"); group.className="group";
+
+  const header = document.createElement("div"); header.className="group-header";
+  const title = document.createElement("div"); title.className="group-title"; title.textContent=`Condition ${idx}`;
+  const count = document.createElement("div"); count.className="group-count"; count.textContent="(0 items)";
+  const actions = document.createElement("div"); actions.className="group-actions";
+  header.appendChild(title); header.appendChild(count); header.appendChild(actions);
+
+  const body = document.createElement("div"); body.className="group-body";
+
+  // Collapsible inline adder
+  const adder = document.createElement("div");
+  adder.className = "group-adder";
+  adder.innerHTML = `
+    <div class="adder-collapsed">
+      <span class="plus">+</span>
+      <span>Add condition</span>
+    </div>
+
+    <div class="adder-panel">
+      <div class="adder-form adder--two">
+        <div>
+          <label>Field</label>
+          <select class="select adder-field"></select>
+        </div>
+        <div class="adder-props"></div>
+      </div>
+      <div class="adder-actions">
+        <button type="button" class="btn btn-sm adder-cancel">Cancel</button>
+        <button type="button" class="btn btn-sm adder-add-btn">Add to this condition</button>
+      </div>
+    </div>
+  `;
+
+  group.appendChild(header);
+  group.appendChild(body);
+  group.appendChild(adder);
+
+  // click to set active
+  group.addEventListener("click",(e)=>{
+    if (e.target.closest(".group-actions")) return;
+    setActiveGroup(group); currentGroup=group;
+  });
+
+  // hydrate the adder
+  initGroupAdder(group);
+
+  return group;
+}
+
+// -- Delegated handlers for Add condition UI (works for all current/future groups)
+nodes.addEventListener("click", (e) => {
+  const collapsed = e.target.closest(".adder-collapsed");
+  if (collapsed) {
+    const group = collapsed.closest(".group");
+    if (group) {
+      group.classList.add("open");
+      const sel = group.querySelector(".adder-field");
+      if (sel) sel.focus();
+    }
+    e.stopPropagation();
+    return;
   }
+
+  const cancel = e.target.closest(".adder-cancel");
+  if (cancel) {
+    const group = cancel.closest(".group");
+    if (group) group.classList.remove("open");
+    e.stopPropagation();
+    return;
+  }
+
+  const addBtn = e.target.closest(".adder-add-btn");
+  if (addBtn) {
+    const group = addBtn.closest(".group");
+    if (!group) return;
+
+    const sel = group.querySelector(".adder-field");
+    if (!sel) return;
+
+    const field = sel.value;
+    const read = readAdderProps(group, field);
+
+    // validation
+    if (!read.ok) {
+      group.classList.add("open");
+      const firstInvalid = group.querySelector('.adder-props [data-adder-prop]:invalid');
+      if (firstInvalid) firstInvalid.focus();
+      return;
+    }
+
+    // route to proper group (tag auto-split vs. unique fields)
+    let target;
+    if (field === "Tag") {
+      const relApi = REL_MAP[read.values?.Relation || ""] || "=";
+      const incoming = {
+        field: "tag",
+        key: String(read.values.Key ?? ""),
+        relation: relApi,
+        value: read.values.Value != null ? String(read.values.Value) : undefined
+      };
+      target = findTargetGroupForTag(incoming, group);
+    } else {
+      target = findTargetGroupFor(field, group);
+    }
+
+    const node = createNodeInGroup(field, read.values, target);
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    resetAdderProps(group, field);
+    group.classList.remove("open");
+    refreshCodeSample();
+
+    e.stopPropagation();
+  }
+});
 
   function setActiveGroup(group){ getGroups().forEach(g=>g.classList.remove("active")); if (group) group.classList.add("active"); }
   function updateGroupCount(group){ const n = group.querySelectorAll(".group-body .node").length; group.querySelector(".group-count").textContent=`(${n} item${n===1?"":"s"})`; }
@@ -771,7 +1035,16 @@ function findTargetGroupForTag(incoming, preferredGroup) {
       grp.appendChild(lab); grp.appendChild(input); propsBox.appendChild(grp);
     });
     toggleValueVisibility(field);
-  }
+        function applyTwoColSpan(formEl) {
+            const groups = [...formEl.querySelectorAll('.form-group')];
+            groups.forEach(g => g.classList.remove('span-all'));
+            if (groups.length === 3) groups[2].classList.add('span-all');
+        }
+
+        // after rendering your props:
+        const formEl = group.querySelector('.adder-form');
+        if (formEl) applyTwoColSpan(formEl);
+    }
 
   function toggleValueVisibility(field){
     const relSel=document.getElementById("prop-Relation");

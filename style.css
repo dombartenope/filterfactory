@@ -108,6 +108,31 @@ padding:10px 12px;border-radius:12px;cursor:pointer;transition:box-shadow 120ms 
 .form-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .props{display:grid;gap:12px}
 
+/* ========= Inline Conditions / Filters ========= */
+.group-adder { margin-top: 10px; }
+
+.group-adder .adder-panel { display: none; }
+.group .group-adder .adder-panel { display: none; } /* default hidden */
+.group.open .group-adder .adder-panel { display: block; }
+.group-adder .adder-collapsed {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  padding: 10px 12px; border: 1px dashed var(--border);
+  border-radius: 12px; color: var(--muted);
+}
+
+/* Keep inputs/selects visually consistent inside the adder */
+.group-adder .input,
+.group-adder .select {
+  width: 100%;
+}
+
+/* Responsive: stack the form on small widths */
+@media (max-width: 900px) {
+  .group-adder .adder-form { grid-template-columns: 1fr; }
+  .group-adder .adder-field-row { grid-column: 1 / -1; }
+}
+
+
 /* ========= Nodes / Groups ========= */
 .nodes{
 width:100%;max-width:100%;gap:10px;position:relative;padding-right:18px;padding-bottom:64px}

@@ -57,8 +57,12 @@ document.addEventListener("DOMContentLoaded", () => {
     first_session:"FirstSession", last_session:"LastSession"
   };
 
+  /** Populate Field select */
+  // Object.keys(schema).forEach(k => {
+  //   const o = document.createElement("option"); o.value = k; o.textContent = k; fieldSel.appendChild(o);
+  // });
     /** Populate Field select (only if the old sidebar select is present) */
-if(fieldSel) {
+if (fieldSel) {
   Object.keys(schema).forEach(k => {
     const o = document.createElement("option");
     o.value = k; o.textContent = k;
@@ -899,25 +903,14 @@ function findTargetGroupForTag(incoming, preferredGroup) {
   }
 
   /** ========= Events ========= */
-    if (fieldSel){ 
-        fieldSel.addEventListener("change", ()=>renderProps(fieldSel.value));
-    }
-if (newConditionBtn) {
+  fieldSel.addEventListener("change", ()=>renderProps(fieldSel.value));
+
   newConditionBtn.addEventListener("click", ()=>{
-    const g=createGroup(getGroups().length+1);
-    nodes.appendChild(g);
-    renumberGroups(); setActiveGroup(g); currentGroup=g;
-    g.scrollIntoView({behavior:"smooth", block:"center"});
+    const g=createGroup(getGroups().length+1); nodes.appendChild(g);
+    renumberGroups(); setActiveGroup(g); currentGroup=g; g.scrollIntoView({behavior:"smooth", block:"center"});
     refreshCodeSample();
   });
-}
-  // newConditionBtn.addEventListener("click", ()=>{
-  //   const g=createGroup(getGroups().length+1); nodes.appendChild(g);
-  //   renumberGroups(); setActiveGroup(g); currentGroup=g; g.scrollIntoView({behavior:"smooth", block:"center"});
-  //   refreshCodeSample();
-  // });
 
-if (form) {
   form.addEventListener("submit", (e)=>{
     e.preventDefault();
     const field=fieldSel.value;
@@ -953,7 +946,6 @@ if (form) {
     toggleValueVisibility(field);
     refreshCodeSample();
   });
-}
 
   copyBtn?.addEventListener("click", async ()=>{
     filtersOutput.select(); filtersOutput.setSelectionRange(0, filtersOutput.value.length);
@@ -1026,9 +1018,7 @@ if (form) {
   }
 
   // initial render
-    if(fieldSel) {
   renderProps(fieldSel.value);
-    }
   refreshCodeSample();
 
   /** ========= Props controls ========= */

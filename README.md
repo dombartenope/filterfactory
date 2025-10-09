@@ -13,9 +13,6 @@
 - Visual filter builder
     - Add/Remove filters & conditions for clarity on complex filters
     - Visually show logic surrounding filters that can exist within the same group
-    ![Auto Grouping Feature](/images/auto-group.gif)
-    - Warnings for overridden condition logic
-    ![Override Warning](/images/override-warning.png)
 - Type or Paste JSON to see your filters visually
     - Copy to clipboard
     - Inline error handling and Error Message

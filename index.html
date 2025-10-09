@@ -13,7 +13,19 @@
             <main class="canvas">
                 <div class="canvas-inner">
                     <!-- Center: nodes -->
-                    <section class="nodes" id="nodes"></section>
+                    <section class="left-pane">
+                        <section id="nodes" class="nodes"></section>
+
+                        <!-- Contextual empty state (shown only when there are no nodes) -->
+                        <div id="emptyState" class="empty-state">
+                            <div class="empty-title">💡 <strong>Start building your audience filters</strong></div>
+                            <div class="empty-content">
+                                Each condition represents a group of filters joined with AND logic. If you add a filter within the condition that can't be combined with the others, an OR will be created automatically.
+                                <br><br>
+                                Add your first condition, or edit the JSON directly, to begin.
+                            </div>
+                        </div>
+                    </section>
 
                     <!-- Right: code sample -->
                     <aside class="codepane">

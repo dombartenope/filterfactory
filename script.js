@@ -342,6 +342,8 @@ function resetAdderProps(group, field){
     editToggle.addEventListener("change", () => {
       filtersOutput.readOnly = !editToggle.checked;
       filtersOutput.classList.toggle("editable", editToggle.checked);
+      // Remove glow animation when user interacts with the toggle
+      editToggle.closest('.toggle').classList.remove('first-action-glow');
     });
   }
 
@@ -420,6 +422,7 @@ function resetAdderProps(group, field){
       if (currentGroup) setActiveGroup(currentGroup);
       renumberGroups();
       refreshCodeSample();
+            refreshEmptyState();
     });
     return btn;
   }
@@ -485,6 +488,8 @@ nodes.addEventListener("click", (e) => {
       const sel = group.querySelector(".adder-field");
       if (sel) sel.focus();
     }
+    // Remove glow animation when user interacts with the button
+    collapsed.classList.remove('first-action-glow');
     e.stopPropagation();
     return;
   }
@@ -537,6 +542,7 @@ nodes.addEventListener("click", (e) => {
     resetAdderProps(group, field);
     group.classList.remove("open");
     refreshCodeSample();
+            refreshEmptyState();
 
     e.stopPropagation();
   }
@@ -799,7 +805,10 @@ function findTargetGroupForTag(incoming, preferredGroup) {
     remove.className="btn btn-sm remove";
     remove.textContent="Remove";
     remove.addEventListener("click",()=>{
-      node.remove(); updateGroupCount(group); refreshCodeSample();
+            node.remove(); 
+            updateGroupCount(group); 
+            refreshCodeSample(); 
+            refreshEmptyState();
     });
     node.appendChild(remove);
     body.appendChild(node); updateGroupCount(group); return node;
@@ -882,6 +891,7 @@ function findTargetGroupForTag(incoming, preferredGroup) {
     renumberGroups();
     const last=getGroups()[getGroups().length-1]; setActiveGroup(last); currentGroup=last;
     refreshCodeSample();
+    refreshEmptyState();
   }
 
   /** ========= Code sample output ========= */
@@ -952,6 +962,7 @@ if (form) {
     });
     toggleValueVisibility(field);
     refreshCodeSample();
+    refreshEmptyState();
   });
 }
 
@@ -971,7 +982,19 @@ if (form) {
 
       const fullText = filtersOutput.value;
       const raw = fullText.trim();
-      if (!raw) return;
+      if (!raw) {
+        // If JSON is empty, clear all filters and show empty state
+        nodes.innerHTML = "";
+        currentGroup = null;
+        const g = createGroup(1);
+        nodes.appendChild(g);
+        setActiveGroup(g);
+        currentGroup = g;
+        renumberGroups();
+        refreshCodeSample();
+        refreshEmptyState();
+        return;
+      }
 
       // Pre-checks
       const pre = detectCommonJsonIssues(fullText);
@@ -1065,6 +1088,38 @@ if (form) {
         if (formEl) applyTwoColSpan(formEl);
     }
 
+
+function refreshEmptyState() {
+  const empty = document.getElementById('emptyState');
+  if (!empty) return;
+
+  // Count all filter nodes across all groups
+  const totalNodes = document.querySelectorAll('.group .node').length;
+
+  // Show when there are NO nodes at all, otherwise hide
+  empty.style.display = totalNodes === 0 ? 'block' : 'none';
+  
+  // Manage the glow animation on the first "+ Add Condition" button
+  const firstAddButton = document.querySelector('.group-adder .adder-collapsed');
+  if (firstAddButton) {
+    if (totalNodes === 0) {
+      firstAddButton.classList.add('first-action-glow');
+    } else {
+      firstAddButton.classList.remove('first-action-glow');
+    }
+  }
+  
+  // Manage the glow animation on the "Edit" toggle
+  const editToggle = document.querySelector('.toggle');
+  if (editToggle) {
+    if (totalNodes === 0) {
+      editToggle.classList.add('first-action-glow');
+    } else {
+      editToggle.classList.remove('first-action-glow');
+    }
+  }
+}
+
   function toggleValueVisibility(field){
     const relSel=document.getElementById("prop-Relation");
     const valueGroup=document.querySelector('[data-prop="Value"]');
@@ -1093,5 +1148,5 @@ if (form) {
     }
     return {ok:true, values};
   }
-
+refreshEmptyState()
 });

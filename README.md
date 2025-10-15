@@ -7,7 +7,7 @@
 **Example:** To target users in the US with the data tag `level` greater than 10, you would create a condition with two filters:
 
 ### Features
-- Filter creator sidebar
+- Inline filter creator 
     - Dynamically populated relation & parameter options based on what each `field` supports
     - Option to create multiple conditions within a single group, or create new groups
 - Visual filter builder
